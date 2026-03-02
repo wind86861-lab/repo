@@ -1,0 +1,526 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  CLINIC_ADMIN
+  PATIENT
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  role      Role     @default(PATIENT)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  diagnosticServices DiagnosticService[] @relation("CreatedBy")
+  surgicalServices   SurgicalService[]   @relation("SurgicalCreatedBy")
+
+  appointments Appointment[]
+  reviews      Review[]
+}
+
+model ServiceCategory {
+  id        String   @id @default(uuid())
+  parentId  String?
+  level     Int      @default(0)
+  nameUz    String
+  nameRu    String?
+  nameEn    String?
+  slug      String   @unique
+  icon      String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parent   ServiceCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children ServiceCategory[] @relation("CategoryHierarchy")
+
+  diagnosticServices DiagnosticService[]
+  surgicalServices   SurgicalService[]
+}
+
+model DiagnosticService {
+  id               String  @id @default(uuid())
+  nameUz           String
+  nameRu           String?
+  nameEn           String?
+  categoryId       String
+  shortDescription String? @db.VarChar(200)
+  fullDescription  String? @db.Text
+
+  priceRecommended Int @default(0)
+  priceMin         Int @default(0)
+  priceMax         Int @default(0)
+
+  durationMinutes Int   @default(30)
+  resultTimeHours Float @default(24)
+
+  preparation       String? @db.Text
+  contraindications String? @db.Text
+  sampleType        String? @db.VarChar(100)
+
+  imageUrl String?
+  isActive Boolean @default(true)
+
+  createdById String
+  createdBy   User   @relation("CreatedBy", fields: [createdById], references: [id])
+
+  category ServiceCategory @relation(fields: [categoryId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  appointments Appointment[]             @relation("DiagnosticServiceAppointments")
+  clinicLinks  ClinicDiagnosticService[] @relation("DiagnosticServiceClinicLinks")
+
+  @@index([categoryId])
+  @@index([isActive])
+  @@index([priceRecommended])
+}
+
+model SurgicalService {
+  id String @id @default(uuid())
+
+  // Basic
+  nameUz           String
+  nameRu           String?
+  nameEn           String?
+  categoryId       String
+  shortDescription String? @db.VarChar(200)
+  fullDescription  String? @db.Text
+  imageUrl         String?
+
+  // Pricing & Time
+  priceRecommended Int
+  priceMin         Int
+  priceMax         Int
+  durationMinutes  Int  @default(0)
+  minDuration      Int?
+  maxDuration      Int?
+  recoveryDays     Int  @default(0)
+
+  // Anesthesia
+  anesthesiaType  AnesthesiaType
+  anesthesiaNotes String?        @db.Text
+
+  // Hospitalization
+  requiresHospitalization Boolean   @default(true)
+  hospitalizationDays     Int?
+  roomType                RoomType?
+  requiresICU             Boolean   @default(false)
+  icuDays                 Int?
+  hospitalizationNotes    String?   @db.Text
+
+  // Pre-operation
+  requiredTests             Json? // Array of test requirements
+  preparationFasting        Boolean @default(false)
+  fastingHours              Int?
+  preparationMedication     String? @db.Text
+  preparationRestrictions   Json? // Array of restrictions
+  preparationTimeline       String? @db.Text
+  contraindicationsAbsolute Json? // Array
+  contraindicationsRelative Json? // Array
+
+  // Operation Details
+  complexity            Complexity
+  riskLevel             RiskLevel
+  minSurgeonExperience  Int        @default(0)
+  surgeonQualifications Json? // Array
+  surgeonSpecialization String?
+  requiredEquipment     Json? // Array of equipment
+  operationStages       Json? // Array of stages
+
+  // Post-operation
+  postOpImmediate    Json? // monitoring, meds, restrictions
+  postOpHome         Json? // home care instructions
+  followUpSchedule   Json? // Array of follow-up visits
+  recoveryMilestones Json? // Array of milestones
+
+  // Package
+  packageIncluded Json? // What's included
+  packageExcluded Json? // What's not included (+ prices)
+
+  // Additional
+  alternatives Json? // Array of alternatives
+  faqs         Json? // Array of FAQs
+  successRate  Float?
+  videoUrl     String?
+
+  // Status & Meta
+  isActive    Boolean  @default(true)
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy User            @relation("SurgicalCreatedBy", fields: [createdById], references: [id])
+  category  ServiceCategory @relation(fields: [categoryId], references: [id])
+
+  appointments Appointment[]           @relation("SurgicalServiceAppointments")
+  clinicLinks  ClinicSurgicalService[] @relation("SurgicalServiceClinicLinks")
+
+  @@index([categoryId])
+  @@index([isActive])
+  @@index([complexity])
+  @@index([riskLevel])
+}
+
+enum AnesthesiaType {
+  LOCAL
+  GENERAL
+  SPINAL
+  SEDATION
+}
+
+enum RoomType {
+  STANDARD
+  COMFORT
+  LUX
+  VIP
+}
+
+enum Complexity {
+  SIMPLE
+  MEDIUM
+  COMPLEX
+  ADVANCED
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ClinicStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  BLOCKED
+}
+
+enum ClinicType {
+  GENERAL
+  SPECIALIZED
+  DIAGNOSTIC
+  DENTAL
+  MATERNITY
+  REHABILITATION
+  PHARMACY
+  OTHER
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum AppointmentServiceType {
+  DIAGNOSTIC
+  SURGICAL
+  OTHER
+}
+
+model Clinic {
+  id          String       @id @default(uuid())
+  nameUz      String
+  nameRu      String?
+  nameEn      String?
+  type        ClinicType   @default(GENERAL)
+  status      ClinicStatus @default(PENDING)
+  description String?      @db.Text
+  logo        String?
+  coverImage  String?
+
+  // Location
+  region    String
+  district  String
+  street    String
+  apartment String?
+  landmark  String?
+  latitude  Float?
+  longitude Float?
+
+  // Contact
+  phones      Json    @default("[]")
+  emails      Json    @default("[]")
+  website     String?
+  socialMedia Json?
+
+  // Schedule
+  workingHours     Json    @default("[]")
+  hasEmergency     Boolean @default(false)
+  hasAmbulance     Boolean @default(false)
+  hasOnlineBooking Boolean @default(true)
+
+  // Infrastructure
+  bedsCount        Int?
+  floorsCount      Int?
+  parkingAvailable Boolean @default(false)
+  amenities        Json?
+
+  // Payment
+  paymentMethods    Json?
+  insuranceAccepted Json?
+  priceRange        String?
+
+  // Ratings
+  averageRating Float? @default(0)
+  reviewCount   Int    @default(0)
+
+  // Documents
+  registrationNumber String    @unique
+  taxId              String    @unique
+  licenseNumber      String
+  licenseIssuedAt    DateTime?
+  licenseExpiresAt   DateTime?
+  licenseIssuedBy    String?
+
+  // Admin contact
+  adminFirstName String
+  adminLastName  String
+  adminEmail     String
+  adminPhone     String
+  adminPosition  String?
+
+  // Moderation
+  rejectionReason String?
+  notes           String? @db.Text
+  approvedById    String?
+
+  doctors            Doctor[]
+  appointments       Appointment[]
+  reviews            Review[]
+  diagnosticServices ClinicDiagnosticService[]
+  surgicalServices   ClinicSurgicalService[]
+  checkupPackages    ClinicCheckupPackage[]
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([region])
+  @@index([type])
+}
+
+model Doctor {
+  id        String   @id @default(uuid())
+  clinicId  String
+  firstName String
+  lastName  String
+  specialty String?
+  bio       String?  @db.Text
+  photoUrl  String?
+  phone     String?
+  email     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  clinic       Clinic        @relation(fields: [clinicId], references: [id])
+  appointments Appointment[]
+
+  @@index([clinicId])
+  @@index([isActive])
+}
+
+model Appointment {
+  id                  String                 @id @default(uuid())
+  clinicId            String
+  patientId           String
+  doctorId            String?
+  serviceType         AppointmentServiceType @default(OTHER)
+  diagnosticServiceId String?
+  surgicalServiceId   String?
+  scheduledAt         DateTime
+  status              AppointmentStatus      @default(PENDING)
+  price               Int                    @default(0)
+  notes               String?                @db.Text
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  clinic  Clinic  @relation(fields: [clinicId], references: [id])
+  patient User    @relation(fields: [patientId], references: [id])
+  doctor  Doctor? @relation(fields: [doctorId], references: [id])
+
+  diagnosticService DiagnosticService? @relation("DiagnosticServiceAppointments", fields: [diagnosticServiceId], references: [id])
+  surgicalService   SurgicalService?   @relation("SurgicalServiceAppointments", fields: [surgicalServiceId], references: [id])
+
+  @@index([clinicId])
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  clinicId  String
+  userId    String
+  rating    Float
+  comment   String?  @db.Text
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([clinicId, userId])
+  @@index([clinicId])
+  @@index([userId])
+  @@index([rating])
+  @@index([isActive])
+}
+
+model ClinicDiagnosticService {
+  clinicId            String
+  diagnosticServiceId String
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+
+  clinic            Clinic            @relation(fields: [clinicId], references: [id])
+  diagnosticService DiagnosticService @relation("DiagnosticServiceClinicLinks", fields: [diagnosticServiceId], references: [id])
+
+  @@id([clinicId, diagnosticServiceId])
+  @@index([clinicId])
+  @@index([diagnosticServiceId])
+  @@index([isActive])
+}
+
+model ClinicSurgicalService {
+  clinicId          String
+  surgicalServiceId String
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+
+  clinic          Clinic          @relation(fields: [clinicId], references: [id])
+  surgicalService SurgicalService @relation("SurgicalServiceClinicLinks", fields: [surgicalServiceId], references: [id])
+
+  @@id([clinicId, surgicalServiceId])
+  @@index([clinicId])
+  @@index([surgicalServiceId])
+  @@index([isActive])
+}
+
+// ─── CHECKUP PACKAGES ────────────────────────────────────────────────────────
+model CheckupPackage {
+  id                String   @id @default(cuid())
+  
+  // Names (multi-language)
+  nameUz            String
+  nameRu            String?
+  nameEn            String?
+  slug              String   @unique
+  
+  // Category
+  category          CheckupCategory
+  
+  // Descriptions
+  shortDescription  String?  @db.VarChar(200)
+  fullDescription   String?  @db.Text
+  
+  // Target audience
+  targetAudience    String?  @db.VarChar(100)
+  
+  // Pricing
+  recommendedPrice  Int      // UZS
+  priceMin          Int      // Min for clinics
+  priceMax          Int      // Max for clinics
+  discount          Int?     // Discount amount vs individual prices
+  
+  // Media
+  imageUrl          String?
+  
+  // Status
+  isActive          Boolean  @default(true)
+  
+  // Relations
+  items             CheckupPackageItem[]
+  clinicPackages    ClinicCheckupPackage[]
+  
+  // Metadata
+  createdById       String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([category])
+  @@index([isActive])
+  @@index([slug])
+}
+
+model CheckupPackageItem {
+  id                  String   @id @default(cuid())
+  
+  packageId           String
+  package             CheckupPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  
+  // Reference to diagnostic service
+  diagnosticServiceId String
+  
+  // Cached data (denormalized for performance)
+  serviceName         String   // From DiagnosticService.nameUz
+  servicePrice        Int      // From DiagnosticService.priceRecommended
+  
+  // Package-specific
+  quantity            Int      @default(1)
+  isRequired          Boolean  @default(true)
+  notes               String?  @db.VarChar(255)
+  
+  // Order
+  sortOrder           Int      @default(0)
+  
+  @@index([packageId])
+  @@index([diagnosticServiceId])
+}
+
+model ClinicCheckupPackage {
+  id              String   @id @default(cuid())
+  
+  clinicId        String
+  clinic          Clinic         @relation(fields: [clinicId], references: [id])
+  packageId       String
+  package         CheckupPackage @relation(fields: [packageId], references: [id])
+  
+  // Clinic's custom data
+  clinicPrice     Int      // Must be between priceMin and priceMax
+  customNotes     String?  @db.Text
+  
+  // Status
+  isActive        Boolean  @default(true)
+  
+  // Stats
+  bookingCount    Int      @default(0)
+  
+  // Metadata
+  activatedAt     DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([clinicId, packageId])
+  @@index([clinicId])
+  @@index([packageId])
+  @@index([isActive])
+}
+
+enum CheckupCategory {
+  BASIC          // Bazaviy (umumiy)
+  SPECIALIZED    // Ixtisoslashgan (kardio, gastro, etc.)
+  AGE_BASED      // Yosh guruhi (40+, ayollar, etc.)
+}

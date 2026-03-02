@@ -1,0 +1,134 @@
+Medical Booking Admin System:
+Comprehensive Functionality Report
+
+This report provides a detailed overview of the medical booking admin site, documenting
+its core modules, specific functions, and data entry requirements.
+
+1. System Architecture Overview
+
+The system is designed as a centralized administrative hub for managing a medical booking
+ecosystem. It facilitates the coordination between clinics, medical services, and end-users.
+Module
+
+Primary Purpose
+
+Clinics
+
+Facility Management
+
+Users
+
+CRM
+
+Appointments
+
+Operations
+
+Payments
+
+Financials
+
+Services
+
+Catalog Management
+
+Templates
+
+Standardization
+
+Engagement
+
+Marketing & Alerts
+
+2. Detailed Functional Modules
+
+Key Features
+Onboarding clinics, managing
+their services, packages, and
+payment settings.
+Tracking user activity,
+purchase history, and
+demographic data.
+Real-time monitoring of
+medical bookings and their
+fulfillment status.
+Transaction logging and
+status tracking across
+multiple providers.
+Maintaining a global database
+of medical procedures and
+tests.
+Creating reusable blueprints
+for packages and checkups.
+Managing promotional
+banners and multi-channel
+notifications.
+
+2.1 Clinic Management
+
+The Clinics module is the most complex part of the system, allowing for granular control
+over each medical facility.
+Clinic Onboarding & Editing:
+• Basic Info: Name, detailed description, and operating hours.
+• Visuals: Support for high-resolution image uploads.
+• Status Control: "Coming Soon" toggle for pre-launch visibility.
+Operational Sub-modules:
+• Location Control: Dedicated interface for managing geographic data and facilityspecific imagery.
+• Package Management: Clinics can offer specific "Packages" (e.g., "Laser Surgery") with
+custom pricing and discounts.
+• Payment Integration: Secure configuration for Payme and Alifpay credentials per
+clinic.
+
+2.2 User & Appointment Tracking
+
+The system provides a comprehensive view of the user base and their interactions.
+• User Profiles: Captures full identity data, including Telegram usernames, phone
+numbers, and gender.
+• Activity Metrics: Tracks "Last Purchase" and "Purchase Count" to identify high-value
+users.
+• Appointment Lifecycle: Monitors the journey from booking to completion, including
+payment verification.
+
+2.3 Global Catalog & Templates
+
+To ensure consistency across the platform, the system uses global catalogs and templates.
+• Global Services: A hierarchical list of all possible medical services (e.g., "Blood
+Analysis" as a parent with specific tests as children).
+• Package & Checkup Templates: Standardized blueprints that can be applied to any
+clinic, categorized by type (Operation, Diagnostic, etc.).
+
+2.4 Communication & Marketing
+
+• Banners: Time-bound promotional assets with priority-based display and redirection
+
+URLs.
+
+• Notifications: A powerful alert system supporting broadcast messages or targeted user
+
+alerts, with optional integration for Telegram delivery.
+
+3. Data Entry Requirements
+
+When adding or updating information, the following fields are typically required:
+Entity
+Clinic
+Package
+Service
+Banner
+Notification
+
+4. System Workflow
+
+Required Inputs
+Name, Description, Opening/Closing Hours,
+Images.
+Name, Description, Price (Uzs), Discount (%).
+Name, Description, Parent Category (if
+applicable).
+Title, Image, Start/End Dates, Priority.
+Title, Message, Recipient Type, Schedule Date.
+
+The following flowchart illustrates the administrative workflow and the interconnectedness
+of the modules:
+
+
