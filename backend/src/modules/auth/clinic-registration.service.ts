@@ -167,54 +167,90 @@ export const createClinicRegistration = async (input: RegistrationInput) => {
     })
   );
 
-  // 5. Create Clinic directly with source=SELF_REGISTERED; store persons in pendingPersons
+  // 5. Create Clinic AND User accounts in transaction
   const primary = hashedPersons[0];
-  const clinic = await (prisma.clinic as any).create({
-    data: {
-      nameUz: input.nameUz,
-      nameRu: input.nameRu ?? null,
-      nameEn: input.nameEn ?? null,
-      type: CLINIC_TYPE_MAP[input.clinicType] ?? 'GENERAL',
-      description: input.descriptionUz,
-      logo: input.logoUrl ?? null,
-      source: 'SELF_REGISTERED',
-      status: 'PENDING',
-      isActive: false,
-      submittedAt: new Date(),
+  const result = await prisma.$transaction(async (tx) => {
+    // Create clinic
+    const clinic = await (tx.clinic as any).create({
+      data: {
+        nameUz: input.nameUz,
+        nameRu: input.nameRu ?? null,
+        nameEn: input.nameEn ?? null,
+        type: CLINIC_TYPE_MAP[input.clinicType] ?? 'GENERAL',
+        description: input.descriptionUz,
+        logo: input.logoUrl ?? null,
+        source: 'SELF_REGISTERED',
+        status: 'PENDING',
+        isActive: false,
+        submittedAt: new Date(),
 
-      region: input.regionId,
-      district: input.districtId,
-      street: input.streetAddress,
-      landmark: input.landmark ?? null,
-      latitude: input.latitude ?? null,
-      longitude: input.longitude ?? null,
+        region: input.regionId,
+        district: input.districtId,
+        street: input.streetAddress,
+        landmark: input.landmark ?? null,
+        latitude: input.latitude ?? null,
+        longitude: input.longitude ?? null,
 
-      phones: [input.primaryPhone, input.secondaryPhone, input.emergencyPhone].filter(Boolean),
-      emails: input.email ? [input.email] : [],
-      website: input.website ?? null,
-      workingHours: input.workingHours ?? {},
+        phones: [input.primaryPhone, input.secondaryPhone, input.emergencyPhone].filter(Boolean),
+        emails: input.email ? [input.email] : [],
+        website: input.website ?? null,
+        workingHours: input.workingHours ?? {},
 
-      taxId: input.inn ?? null,
-      licenseNumber: input.licenseNumber ?? null,
+        taxId: input.inn ?? null,
+        licenseNumber: input.licenseNumber ?? null,
 
-      adminFirstName: primary?.firstName ?? null,
-      adminLastName: primary?.lastName ?? null,
-      adminEmail: primary?.email ?? input.email ?? null,
-      adminPhone: primary?.phone ?? input.primaryPhone ?? null,
-      adminPosition: primary?.position ?? null,
+        adminFirstName: primary?.firstName ?? null,
+        adminLastName: primary?.lastName ?? null,
+        adminEmail: primary?.email ?? input.email ?? null,
+        adminPhone: primary?.phone ?? input.primaryPhone ?? null,
+        adminPosition: primary?.position ?? null,
 
-      pendingPersons: hashedPersons as any,
-    },
-    select: {
-      id: true,
-      status: true,
-      nameUz: true,
-      adminPhone: true,
-      createdAt: true,
-      submittedAt: true,
-      pendingPersons: true,
-    },
+        pendingPersons: hashedPersons as any,
+      },
+      select: {
+        id: true,
+        status: true,
+        nameUz: true,
+        adminPhone: true,
+        createdAt: true,
+        submittedAt: true,
+        pendingPersons: true,
+      },
+    });
+
+    // Create User accounts immediately with PENDING_CLINIC role
+    // Only primary person gets clinicId (it's @unique)
+    const users = await Promise.all(
+      hashedPersons.map(async (person, index) => {
+        const isPrimary = index === 0;
+        return tx.user.create({
+          data: {
+            phone: person.phone,
+            email: person.email ?? null,
+            passwordHash: person.passwordHash,
+            firstName: person.firstName,
+            lastName: person.lastName,
+            role: 'PENDING_CLINIC',
+            status: 'PENDING',
+            isActive: true,
+            ...(isPrimary && { clinicId: clinic.id }),
+          },
+          select: {
+            id: true,
+            phone: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+            status: true,
+          },
+        });
+      })
+    );
+
+    return { clinic, users };
   });
+
+  const clinic = result.clinic;
 
   return {
     id: clinic.id,
@@ -435,17 +471,25 @@ export const approveRegistration = async (id: string) => {
       },
     });
 
-    // 2. Create users — only primary person gets clinicId (clinicId is @unique)
+    // 2. Update existing PENDING_CLINIC users to CLINIC_ADMIN
     const users = await Promise.all(
       request.persons.map(async (person, index) => {
         const isPrimary = person.isPrimary || index === 0;
         const existing = await tx.user.findFirst({ where: { phone: person.phone } });
+
         if (existing) {
+          // Update existing user (created during registration)
           return tx.user.update({
             where: { id: existing.id },
-            data: { role: 'CLINIC_ADMIN', status: 'APPROVED', ...(isPrimary && { clinicId: clinic.id }) },
+            data: {
+              role: 'CLINIC_ADMIN',
+              status: 'APPROVED',
+              ...(isPrimary && { clinicId: clinic.id })
+            },
           });
         }
+
+        // Fallback: create user if somehow doesn't exist (shouldn't happen with new flow)
         return tx.user.create({
           data: {
             phone: person.phone,

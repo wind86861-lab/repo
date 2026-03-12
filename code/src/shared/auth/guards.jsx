@@ -23,6 +23,7 @@ export const RootRedirect = () => {
   if (isLoading) return <AuthLoading />;
   if (!user) return <Navigate to="/login" replace />;
   if (user.role === 'SUPER_ADMIN') return <Navigate to="/admin/dashboard" replace />;
+  if (user.role === 'PENDING_CLINIC') return <Navigate to="/status" replace />;
   if (PENDING_STATUSES.includes(user.status)) return <Navigate to="/status" replace />;
   if (user.role === 'CLINIC_ADMIN') return <Navigate to="/clinic/dashboard" replace />;
   return <Navigate to="/login" replace />;
@@ -59,6 +60,7 @@ export const ClinicPublicOnlyGuard = ({ children }) => {
   if (isLoading) return <AuthLoading />;
   if (!user) return children;
   if (user.role === 'SUPER_ADMIN') return <Navigate to="/admin/dashboard" replace />;
+  if (user.role === 'PENDING_CLINIC') return <Navigate to="/status" replace />;
   if (PENDING_STATUSES.includes(user.status)) return <Navigate to="/status" replace />;
   if (user.role === 'CLINIC_ADMIN') return <Navigate to="/clinic/dashboard" replace />;
   return children;
@@ -72,6 +74,7 @@ export const ClinicGuard = ({ children }) => {
   if (isLoading) return <AuthLoading />;
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
   if (user.role === 'SUPER_ADMIN') return <Navigate to="/403" replace />;
+  if (user.role === 'PENDING_CLINIC') return <Navigate to="/status" replace />;
   if (user.role !== 'CLINIC_ADMIN') return <Navigate to="/403" replace />;
   if (PENDING_STATUSES.includes(user.status)) return <Navigate to="/status" replace />;
   return children;
@@ -84,6 +87,9 @@ export const StatusGuard = ({ children }) => {
   if (isLoading) return <AuthLoading />;
   if (!user) return <Navigate to="/login" replace />;
   if (user.role === 'SUPER_ADMIN') return <Navigate to="/admin/dashboard" replace />;
+  // Allow PENDING_CLINIC to see status page
+  if (user.role === 'PENDING_CLINIC') return children;
+  // Approved CLINIC_ADMIN should go to dashboard
   if (user.role === 'CLINIC_ADMIN' && user.status === 'APPROVED') return <Navigate to="/clinic/dashboard" replace />;
   return children;
 };

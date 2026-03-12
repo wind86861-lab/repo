@@ -82,6 +82,10 @@ export const login = async (credentials: { phone?: string; email?: string; passw
     if (credentials.phone && user.role === 'SUPER_ADMIN') {
         throw new AppError('Admin hisobi uchun /admin/login sahifasidan foydalaning', 403, ErrorCodes.FORBIDDEN);
     }
+    // Allow PENDING_CLINIC to login (they can see status page)
+    if (credentials.phone && !['CLINIC_ADMIN', 'PENDING_CLINIC', 'PATIENT'].includes(user.role)) {
+        throw new AppError('Noto\'g\'ri login sahifasi', 403, ErrorCodes.FORBIDDEN);
+    }
 
     const accessToken = generateAccessToken({ id: user.id, role: user.role, status: user.status });
     const refreshToken = generateRefreshToken({ id: user.id });
