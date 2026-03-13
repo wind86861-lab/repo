@@ -3,12 +3,13 @@ import {
     Search, List, LayoutGrid, RefreshCw, Loader2,
     CircleCheckBig, Circle, Clock, Beaker, Settings2,
     X, Sparkles, Eye, Info, AlertCircle,
-    BriefcaseMedical, Package,
+    BriefcaseMedical, Package, Filter,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useClinicServices, useActivateService, useDeactivateService } from '../hooks/useClinicServices';
 import ServiceCustomizationDrawer from '../components/services/ServiceCustomizationDrawer';
 import CheckupPackagesTab from '../components/services/CheckupPackagesTab';
+import api from '../../shared/api/axios';
 import './clinic-admin.css';
 
 const fmt = (n) => (n ?? 0).toLocaleString('uz-UZ');
@@ -52,19 +53,50 @@ export default function ClinicServices() {
     const [viewMode, setViewMode] = useState('list');
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
+    const [categoryFilter, setCategoryFilter] = useState('all');
+    const [subcategoryFilter, setSubcategoryFilter] = useState('all');
     const [activeService, setActiveService] = useState(null);
     const [customizeService, setCustomizeService] = useState(null);
     const [confirmDeactivate, setConfirmDeactivate] = useState(null);
+    const [categories, setCategories] = useState([]);
 
     const debouncedSearch = useDebounce(search, 300);
 
+    // Fetch categories from super admin
+    useEffect(() => {
+        api.get('/categories').then(res => {
+            setCategories(res.data.data || []);
+        }).catch(err => console.error('Categories fetch error:', err));
+    }, []);
+
     const { data: services, isLoading, refetch } = useClinicServices({
         search: debouncedSearch || undefined,
+        categoryId: subcategoryFilter !== 'all' ? subcategoryFilter : (categoryFilter !== 'all' ? categoryFilter : undefined),
         onlyActive: false,
     });
 
     const activateMut = useActivateService();
     const deactivateMut = useDeactivateService();
+
+    // Get diagnostic root and its children
+    const diagnosticRoot = useMemo(() => {
+        return categories.find(c => c.level === 0 && c.slug === 'diagnostics');
+    }, [categories]);
+
+    const mainCategories = useMemo(() => {
+        return diagnosticRoot?.children || [];
+    }, [diagnosticRoot]);
+
+    const subcategories = useMemo(() => {
+        if (categoryFilter === 'all') return [];
+        const parent = mainCategories.find(c => c.id === categoryFilter);
+        return parent?.children || [];
+    }, [mainCategories, categoryFilter]);
+
+    // Reset subcategory when main category changes
+    useEffect(() => {
+        setSubcategoryFilter('all');
+    }, [categoryFilter]);
 
     // Filter services
     const filtered = useMemo(() => {
@@ -156,7 +188,7 @@ export default function ClinicServices() {
             </div>
 
             {/* Toolbar */}
-            <div className="ca-toolbar" style={{ marginTop: 16 }}>
+            <div className="ca-toolbar" style={{ marginTop: 16, flexWrap: 'wrap', gap: 12 }}>
                 <div className="ca-search">
                     <Search size={16} className="ca-search-icon" />
                     <input
@@ -165,6 +197,42 @@ export default function ClinicServices() {
                         placeholder="Xizmat nomi bo'yicha qidirish..."
                     />
                 </div>
+                <select
+                    value={categoryFilter}
+                    onChange={e => setCategoryFilter(e.target.value)}
+                    style={{
+                        padding: '8px 14px', borderRadius: 8,
+                        border: '1px solid var(--border-color)',
+                        background: 'var(--bg-card)', color: 'var(--text-main)',
+                        fontSize: 13, minWidth: 180,
+                    }}
+                >
+                    <option value="all">📁 Barcha kategoriyalar</option>
+                    {mainCategories.map(cat => (
+                        <option key={cat.id} value={cat.id}>
+                            {cat.icon || '📁'} {cat.nameUz}
+                        </option>
+                    ))}
+                </select>
+                {categoryFilter !== 'all' && subcategories.length > 0 && (
+                    <select
+                        value={subcategoryFilter}
+                        onChange={e => setSubcategoryFilter(e.target.value)}
+                        style={{
+                            padding: '8px 14px', borderRadius: 8,
+                            border: '1px solid var(--border-color)',
+                            background: 'var(--bg-card)', color: 'var(--text-main)',
+                            fontSize: 13, minWidth: 180,
+                        }}
+                    >
+                        <option value="all">• Barcha yo'nalishlar</option>
+                        {subcategories.map(sub => (
+                            <option key={sub.id} value={sub.id}>
+                                {sub.icon || '•'} {sub.nameUz}
+                            </option>
+                        ))}
+                    </select>
+                )}
                 <select
                     value={statusFilter}
                     onChange={e => setStatusFilter(e.target.value)}
