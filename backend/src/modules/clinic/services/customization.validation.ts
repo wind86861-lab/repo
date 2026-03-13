@@ -37,7 +37,7 @@ export const upsertCustomizationSchema = z.object({
         tags: z.array(z.string().min(2).max(30)).max(10).optional(),
 
         estimatedDurationMinutes: z.number().int().min(5).max(480).optional().nullable(),
-        availableDays: z.array(dayEnum).min(1).max(7).optional(),
+        availableDays: z.array(dayEnum).max(7).optional(),
         availableTimeSlots: availableTimeSlotsSchema,
 
         requiresAppointment: z.boolean().optional(),
