@@ -812,11 +812,14 @@ const Services = () => {
                                                             }}
                                                         >
                                                             <option value="">Tanlang...</option>
-                                                            {(categories.find(c => c.level === 0)?.children || categories).map(cat => (
-                                                                <option key={cat.id} value={cat.id}>
-                                                                    {cat.icon || '📁'} {cat.nameUz}
-                                                                </option>
-                                                            ))}
+                                                            {(() => {
+                                                                const activeRoot = categories.find(c => c.id === activeRootId);
+                                                                return (activeRoot?.children || []).map(cat => (
+                                                                    <option key={cat.id} value={cat.id}>
+                                                                        {cat.icon || '📁'} {cat.nameUz}
+                                                                    </option>
+                                                                ));
+                                                            })()}
                                                         </select>
                                                     </div>
                                                     <div className="col">
@@ -828,8 +831,8 @@ const Services = () => {
                                                         >
                                                             <option value="">Tanlang...</option>
                                                             {(() => {
-                                                                const parent = (categories.find(c => c.level === 0)?.children || categories)
-                                                                    .find(c => c.id === formData.parentCatId);
+                                                                const activeRoot = categories.find(c => c.id === activeRootId);
+                                                                const parent = (activeRoot?.children || []).find(c => c.id === formData.parentCatId);
                                                                 return parent?.children?.map(sub => (
                                                                     <option key={sub.id} value={sub.id}>
                                                                         {sub.icon || '•'} {sub.nameUz}
@@ -854,16 +857,44 @@ const Services = () => {
                                         {formStep === 2 && (
                                             <div className="step-content">
                                                 <h3>Narx va Vaqt</h3>
-                                                <div className="price-grid">
-                                                    <div className="price-item recommended">
-                                                        <label>Tavsiya narx (UZS)</label>
+                                                <div className="form-group row">
+                                                    <div className="col">
+                                                        <label>Minimal narx (UZS) *</label>
                                                         <input
                                                             type="number"
+                                                            min="0"
+                                                            step="1000"
+                                                            placeholder="50000"
+                                                            value={formData.priceMin}
+                                                            onChange={(e) => handleFormChange('priceMin', e.target.value)}
+                                                        />
+                                                    </div>
+                                                    <div className="col">
+                                                        <label>Tavsiya narx (UZS) *</label>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            step="1000"
+                                                            placeholder="75000"
                                                             value={formData.priceRecommended}
                                                             onChange={(e) => handleFormChange('priceRecommended', e.target.value)}
                                                         />
                                                     </div>
+                                                    <div className="col">
+                                                        <label>Maksimal narx (UZS) *</label>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            step="1000"
+                                                            placeholder="100000"
+                                                            value={formData.priceMax}
+                                                            onChange={(e) => handleFormChange('priceMax', e.target.value)}
+                                                        />
+                                                    </div>
                                                 </div>
+                                                <small style={{ color: '#666', fontSize: '12px', display: 'block', marginTop: '-8px', marginBottom: '12px' }}>
+                                                    Narxlar: min ≤ tavsiya ≤ max bo'lishi kerak
+                                                </small>
                                                 <div className="form-group row">
                                                     <div className="col">
                                                         <label>Davomiyligi (daqiqa)</label>
