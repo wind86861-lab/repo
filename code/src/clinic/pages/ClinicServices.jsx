@@ -13,6 +13,20 @@ import './clinic-admin.css';
 
 const fmt = (n) => (n ?? 0).toLocaleString('uz-UZ');
 
+const getDisplayPrice = (s) => {
+    const cust = s.clinicService;
+    if (!cust?.customPrice) return { label: `${fmt(s.priceMin)} – ${fmt(s.priceMax)} UZS`, isCustom: false };
+    const final = cust.discountPercent
+        ? Math.round(cust.customPrice * (1 - cust.discountPercent / 100))
+        : cust.customPrice;
+    return {
+        label: `${fmt(final)} UZS`,
+        original: cust.discountPercent ? fmt(cust.customPrice) : null,
+        discount: cust.discountPercent ?? null,
+        isCustom: true,
+    };
+};
+
 function useDebounce(value, delay) {
     const [debounced, setDebounced] = useState(value);
     useEffect(() => {
@@ -231,8 +245,16 @@ export default function ClinicServices() {
                                             </span>
                                         </td>
                                         <td>
-                                            <strong style={{ color: 'var(--color-primary)' }}>{fmt(s.priceMin)}</strong>
-                                            <span style={{ color: 'var(--text-muted)', fontSize: 12 }}> — {fmt(s.priceMax)} UZS</span>
+                                            {(() => {
+                                                const p = getDisplayPrice(s); return (
+                                                    <span>
+                                                        <strong style={{ color: 'var(--color-primary)' }}>{p.label}</strong>
+                                                        {p.original && <span style={{ color: 'var(--text-muted)', fontSize: 11, textDecoration: 'line-through', marginLeft: 6 }}>{p.original}</span>}
+                                                        {p.discount && <span className="ca-badge" style={{ fontSize: 10, marginLeft: 4, background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>-{p.discount}%</span>}
+                                                        {!p.isCustom && <span style={{ color: 'var(--text-muted)', fontSize: 11 }}> (super admin)</span>}
+                                                    </span>
+                                                );
+                                            })()}
                                         </td>
                                         <td>
                                             <span className={`ca-badge ${isActive ? 'active' : 'inactive'}`}>
@@ -334,7 +356,15 @@ export default function ClinicServices() {
                                 </div>
 
                                 <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-primary)', margin: '4px 0 10px' }}>
-                                    {fmt(s.priceMin)} — {fmt(s.priceMax)} <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)' }}>UZS</span>
+                                    {(() => {
+                                        const p = getDisplayPrice(s); return (
+                                            <span>
+                                                {p.label}
+                                                {p.original && <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)', textDecoration: 'line-through', marginLeft: 6 }}>{p.original}</span>}
+                                                {p.discount && <span className="ca-badge" style={{ fontSize: 10, marginLeft: 4, background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>-{p.discount}%</span>}
+                                            </span>
+                                        );
+                                    })()}
                                 </div>
 
                                 <div className="ca-card-actions" onClick={e => e.stopPropagation()}>

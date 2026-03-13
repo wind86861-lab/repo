@@ -477,6 +477,10 @@ model ServiceCustomization {
   requiresPrepayment       Boolean  @default(false)
   prepaymentPercentage     Int?
 
+  // Clinic-specific pricing
+  customPrice              Int?
+  discountPercent          Int?
+
   // Display metadata
   isHighlighted            Boolean  @default(false)
   displayOrder             Int?

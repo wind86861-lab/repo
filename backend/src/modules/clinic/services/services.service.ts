@@ -97,6 +97,8 @@ export class ClinicServicesService {
                     customCategory: cust?.customCategory || null,
                     estimatedDuration: cust?.estimatedDurationMinutes || null,
                     isHighlighted: cust?.isHighlighted || false,
+                    customPrice: cust?.customPrice ?? null,
+                    discountPercent: cust?.discountPercent ?? null,
                     images: cust?.images || [],
                     hasCustomization: !!cust,
                 },

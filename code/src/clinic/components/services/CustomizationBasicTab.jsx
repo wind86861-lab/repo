@@ -1,4 +1,4 @@
-import { Plus, X } from 'lucide-react';
+import { Plus, X, Tag, BadgePercent } from 'lucide-react';
 import '../../pages/clinic-admin.css';
 
 const TAG_OPTIONS = ['tez', 'aniq', 'arzon', "og'riqsiz", 'qulay', 'professional', 'zamonaviy', 'sifatli'];
@@ -10,8 +10,18 @@ const CATEGORY_OPTIONS = [
     { value: 'VIP', label: 'VIP' },
 ];
 
+const fmt = (n) => n != null ? n.toLocaleString('uz-UZ') : '—';
+
 export default function CustomizationBasicTab({ service, formData, setFormData }) {
     const set = (key, value) => setFormData(prev => ({ ...prev, [key]: value }));
+
+    const baseMin = service?.priceMin ?? 0;
+    const baseMax = service?.priceMax ?? 0;
+    const baseRecommended = service?.priceRecommended ?? 0;
+
+    const discountedPrice = formData.customPrice && formData.discountPercent
+        ? Math.round(formData.customPrice * (1 - formData.discountPercent / 100))
+        : formData.customPrice ?? null;
 
     // Benefits management
     const addBenefit = () => {
@@ -41,6 +51,80 @@ export default function CustomizationBasicTab({ service, formData, setFormData }
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+            {/* ═══ PRICE & DISCOUNT ═══ */}
+            <div style={{
+                background: 'linear-gradient(135deg, rgba(0,201,167,0.06), rgba(59,130,246,0.06))',
+                border: '1px solid rgba(0,201,167,0.25)',
+                borderRadius: 12,
+                padding: 16,
+            }}>
+                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <BadgePercent size={15} style={{ color: 'var(--color-primary)' }} />
+                    Narx va Chegirma
+                </div>
+
+                {/* Reference price from super admin */}
+                <div style={{
+                    fontSize: 11, color: 'var(--text-muted)', marginBottom: 12,
+                    background: 'rgba(0,0,0,0.03)', borderRadius: 6, padding: '6px 10px',
+                    display: 'flex', gap: 16,
+                }}>
+                    <span>Tavsiya: <strong style={{ color: 'var(--color-primary)' }}>{fmt(baseRecommended)} UZS</strong></span>
+                    <span>Oraliq: {fmt(baseMin)} – {fmt(baseMax)} UZS</span>
+                </div>
+
+                <div className="ca-form-row" style={{ alignItems: 'flex-start' }}>
+                    {/* Custom Price */}
+                    <div className="ca-form-group" style={{ flex: 2 }}>
+                        <label className="ca-label">Klinika narxi (UZS)</label>
+                        <input
+                            type="number"
+                            min={0}
+                            step={1000}
+                            value={formData.customPrice ?? ''}
+                            onChange={e => set('customPrice', e.target.value === '' ? null : parseInt(e.target.value) || null)}
+                            placeholder={`${fmt(baseRecommended)} (tavsiya)`}
+                        />
+                        <small style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+                            Bo&#39;sh qoldirsa Super Admin narxi ko&#39;rsatiladi
+                        </small>
+                    </div>
+
+                    {/* Discount */}
+                    <div className="ca-form-group" style={{ flex: 1 }}>
+                        <label className="ca-label">Chegirma (%)</label>
+                        <input
+                            type="number"
+                            min={0}
+                            max={90}
+                            value={formData.discountPercent ?? ''}
+                            onChange={e => set('discountPercent', e.target.value === '' ? null : parseInt(e.target.value) || null)}
+                            placeholder="0"
+                        />
+                    </div>
+                </div>
+
+                {/* Live price preview */}
+                {formData.customPrice && (
+                    <div style={{
+                        marginTop: 8, padding: '8px 12px', borderRadius: 8,
+                        background: 'rgba(0,201,167,0.1)', border: '1px solid rgba(0,201,167,0.2)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    }}>
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Mijoz ko&#39;radi:</span>
+                        <span style={{ fontWeight: 800, fontSize: 16, color: 'var(--color-primary)' }}>
+                            {fmt(discountedPrice)} UZS
+                            {formData.discountPercent > 0 && (
+                                <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)', textDecoration: 'line-through', marginLeft: 8 }}>
+                                    {fmt(formData.customPrice)}
+                                </span>
+                            )}
+                        </span>
+                    </div>
+                )}
+            </div>
+
             {/* Custom Name Uz */}
             <div className="ca-form-group">
                 <label className="ca-label">Maxsus nom (O&#39;zbekcha) — ixtiyoriy</label>

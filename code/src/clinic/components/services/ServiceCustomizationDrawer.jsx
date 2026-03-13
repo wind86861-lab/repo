@@ -30,6 +30,8 @@ const EMPTY_FORM = {
     tags: [],
     customCategory: null,
     estimatedDurationMinutes: null,
+    customPrice: null,
+    discountPercent: null,
     availableDays: [],
     availableTimeSlots: {},
     requiresAppointment: true,
@@ -79,9 +81,9 @@ export default function ServiceCustomizationDrawer({ open, onClose, service }) {
         // Clean empty strings to null for optional fields
         const cleaned = { ...formData };
         ['customNameUz', 'customNameRu', 'customDescriptionUz', 'customDescriptionRu',
-         'preparationUz', 'preparationRu', 'customCategory'].forEach(k => {
-            if (cleaned[k] === '') cleaned[k] = null;
-        });
+            'preparationUz', 'preparationRu', 'customCategory'].forEach(k => {
+                if (cleaned[k] === '') cleaned[k] = null;
+            });
         if (!cleaned.estimatedDurationMinutes) cleaned.estimatedDurationMinutes = null;
         if (!cleaned.displayOrder) cleaned.displayOrder = null;
         if (!cleaned.prepaymentPercentage) cleaned.prepaymentPercentage = null;
