@@ -3,7 +3,7 @@ import {
     Search, List, LayoutGrid, RefreshCw, Loader2,
     CircleCheckBig, Circle, Clock, Beaker, Settings2,
     X, Sparkles, Eye, Info, AlertCircle,
-    BriefcaseMedical, Package, Filter,
+    BriefcaseMedical, Package,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useClinicServices, useActivateService, useDeactivateService } from '../hooks/useClinicServices';
@@ -57,6 +57,8 @@ export default function ClinicServices() {
     const [subcategoryFilter, setSubcategoryFilter] = useState('all');
     const [activeService, setActiveService] = useState(null);
     const [customizeService, setCustomizeService] = useState(null);
+    // activateDrawerService: service object opened from Aktivlashtirish button
+    const [activateDrawerService, setActivateDrawerService] = useState(null);
     const [confirmDeactivate, setConfirmDeactivate] = useState(null);
     const [categories, setCategories] = useState([]);
 
@@ -83,9 +85,7 @@ export default function ClinicServices() {
         return categories.find(c => c.level === 0 && c.slug === 'diagnostics');
     }, [categories]);
 
-    const mainCategories = useMemo(() => {
-        return diagnosticRoot?.children || [];
-    }, [diagnosticRoot]);
+    const mainCategories = useMemo(() => diagnosticRoot?.children || [], [diagnosticRoot]);
 
     const subcategories = useMemo(() => {
         if (categoryFilter === 'all') return [];
@@ -94,43 +94,46 @@ export default function ClinicServices() {
     }, [mainCategories, categoryFilter]);
 
     // Reset subcategory when main category changes
-    useEffect(() => {
-        setSubcategoryFilter('all');
-    }, [categoryFilter]);
+    useEffect(() => { setSubcategoryFilter('all'); }, [categoryFilter]);
 
-    // Filter services
+    // Filter services by status
     const filtered = useMemo(() => {
         if (!services) return [];
         let list = [...services];
-        if (statusFilter === 'active') {
-            list = list.filter(s => s.clinicService?.isActive);
-        } else if (statusFilter === 'inactive') {
-            list = list.filter(s => !s.clinicService?.isActive);
-        }
+        if (statusFilter === 'active') list = list.filter(s => s.clinicService?.isActive);
+        else if (statusFilter === 'inactive') list = list.filter(s => !s.clinicService?.isActive);
         return list;
     }, [services, statusFilter]);
-
-    // Group by category
-    const grouped = useMemo(() => {
-        return filtered.reduce((acc, svc) => {
-            const cat = svc.category?.nameUz ?? 'Boshqa';
-            if (!acc[cat]) acc[cat] = [];
-            acc[cat].push(svc);
-            return acc;
-        }, {});
-    }, [filtered]);
 
     const totalActive = services?.filter(s => s.clinicService?.isActive).length ?? 0;
     const totalServices = services?.length ?? 0;
 
-    const handleActivate = (serviceId) => {
-        activateMut.mutate(serviceId);
+    // Open customization drawer first — customPrice is required before activation
+    const handleActivate = (service) => {
+        setActivateDrawerService(service);
+    };
+
+    // Called by drawer: activate service first, then save customization with the new clinicServiceId
+    const handleSaveAndActivate = async (diagnosticServiceId, formData) => {
+        try {
+            // Step 1: Activate — creates ClinicDiagnosticService record, returns it with id
+            const clinicService = await activateMut.mutateAsync(diagnosticServiceId);
+            const clinicServiceId = clinicService?.id;
+            // Step 2: Save customization if we have the clinicServiceId
+            if (clinicServiceId) {
+                await api.put(`/clinic/services/${clinicServiceId}/customization`, formData);
+            }
+            setActivateDrawerService(null);
+            refetch();
+        } catch (err) {
+            console.error('Activate + customization error:', err);
+        }
     };
 
     const handleDeactivate = () => {
         if (!confirmDeactivate) return;
         deactivateMut.mutate(confirmDeactivate, {
-            onSuccess: () => setConfirmDeactivate(null),
+            onSuccess: () => { setConfirmDeactivate(null); refetch(); },
         });
     };
 
@@ -200,48 +203,29 @@ export default function ClinicServices() {
                 <select
                     value={categoryFilter}
                     onChange={e => setCategoryFilter(e.target.value)}
-                    style={{
-                        padding: '8px 14px', borderRadius: 8,
-                        border: '1px solid var(--border-color)',
-                        background: 'var(--bg-card)', color: 'var(--text-main)',
-                        fontSize: 13, minWidth: 180,
-                    }}
+                    style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-main)', fontSize: 13, minWidth: 180 }}
                 >
                     <option value="all">📁 Barcha kategoriyalar</option>
                     {mainCategories.map(cat => (
-                        <option key={cat.id} value={cat.id}>
-                            {cat.icon || '📁'} {cat.nameUz}
-                        </option>
+                        <option key={cat.id} value={cat.id}>{cat.icon || '📁'} {cat.nameUz}</option>
                     ))}
                 </select>
                 {categoryFilter !== 'all' && subcategories.length > 0 && (
                     <select
                         value={subcategoryFilter}
                         onChange={e => setSubcategoryFilter(e.target.value)}
-                        style={{
-                            padding: '8px 14px', borderRadius: 8,
-                            border: '1px solid var(--border-color)',
-                            background: 'var(--bg-card)', color: 'var(--text-main)',
-                            fontSize: 13, minWidth: 180,
-                        }}
+                        style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-main)', fontSize: 13, minWidth: 180 }}
                     >
                         <option value="all">• Barcha yo'nalishlar</option>
                         {subcategories.map(sub => (
-                            <option key={sub.id} value={sub.id}>
-                                {sub.icon || '•'} {sub.nameUz}
-                            </option>
+                            <option key={sub.id} value={sub.id}>{sub.icon || '•'} {sub.nameUz}</option>
                         ))}
                     </select>
                 )}
                 <select
                     value={statusFilter}
                     onChange={e => setStatusFilter(e.target.value)}
-                    style={{
-                        padding: '8px 14px', borderRadius: 8,
-                        border: '1px solid var(--border-color)',
-                        background: 'var(--bg-card)', color: 'var(--text-main)',
-                        fontSize: 13,
-                    }}
+                    style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-main)', fontSize: 13 }}
                 >
                     {FILTER_OPTIONS.map(f => (
                         <option key={f.value} value={f.value}>{f.label}</option>
@@ -251,12 +235,8 @@ export default function ClinicServices() {
                     <RefreshCw size={16} />
                 </button>
                 <div className="ca-view-toggle">
-                    <button className={viewMode === 'list' ? 'active' : ''} onClick={() => setViewMode('list')}>
-                        <List size={18} />
-                    </button>
-                    <button className={viewMode === 'grid' ? 'active' : ''} onClick={() => setViewMode('grid')}>
-                        <LayoutGrid size={18} />
-                    </button>
+                    <button className={viewMode === 'list' ? 'active' : ''} onClick={() => setViewMode('list')}><List size={18} /></button>
+                    <button className={viewMode === 'grid' ? 'active' : ''} onClick={() => setViewMode('grid')}><LayoutGrid size={18} /></button>
                 </div>
             </div>
 
@@ -277,7 +257,7 @@ export default function ClinicServices() {
                             <tr>
                                 <th>Xizmat nomi</th>
                                 <th>Kategoriya</th>
-                                <th>Narx oralig&#39;i</th>
+                                <th>Narx</th>
                                 <th>Holat</th>
                                 <th>Amallar</th>
                             </tr>
@@ -291,7 +271,9 @@ export default function ClinicServices() {
                                         <td>
                                             <div className="ca-name-cell">
                                                 <span className="main" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                    {isActive ? <CircleCheckBig size={15} color="#10b981" /> : <Circle size={15} color="var(--text-muted)" />}
+                                                    {isActive
+                                                        ? <CircleCheckBig size={15} color="#10b981" />
+                                                        : <Circle size={15} color="var(--text-muted)" />}
                                                     {s.clinicService?.displayNameUz || s.nameUz}
                                                     {hasCust && <Sparkles size={13} color="#FFD700" />}
                                                     {s.clinicService?.isHighlighted && (
@@ -301,9 +283,7 @@ export default function ClinicServices() {
                                                 {s.nameRu && <span className="sub">{s.nameRu}</span>}
                                                 <span className="sub">
                                                     <Clock size={11} /> {s.durationMinutes} daq
-                                                    {s.clinicService?.customCategory && (
-                                                        <> &middot; {s.clinicService.customCategory}</>
-                                                    )}
+                                                    {s.clinicService?.customCategory && <> &middot; {s.clinicService.customCategory}</>}
                                                 </span>
                                             </div>
                                         </td>
@@ -314,7 +294,8 @@ export default function ClinicServices() {
                                         </td>
                                         <td>
                                             {(() => {
-                                                const p = getDisplayPrice(s); return (
+                                                const p = getDisplayPrice(s);
+                                                return (
                                                     <span>
                                                         <strong style={{ color: 'var(--color-primary)' }}>{p.label}</strong>
                                                         {p.original && <span style={{ color: 'var(--text-muted)', fontSize: 11, textDecoration: 'line-through', marginLeft: 6 }}>{p.original}</span>}
@@ -335,7 +316,7 @@ export default function ClinicServices() {
                                                     <button
                                                         className="ca-btn-primary"
                                                         style={{ fontSize: 11, padding: '4px 12px' }}
-                                                        onClick={() => handleActivate(s.id)}
+                                                        onClick={() => handleActivate(s)}
                                                         disabled={activateMut.isPending}
                                                     >
                                                         Aktivlashtirish
@@ -408,14 +389,10 @@ export default function ClinicServices() {
                                         {s.category?.nameUz || '—'}
                                     </span>
                                     {s.clinicService?.customCategory && (
-                                        <span className="ca-badge primary" style={{ fontSize: 10 }}>
-                                            {s.clinicService.customCategory}
-                                        </span>
+                                        <span className="ca-badge primary" style={{ fontSize: 10 }}>{s.clinicService.customCategory}</span>
                                     )}
                                     {s.clinicService?.isHighlighted && (
-                                        <span className="ca-badge" style={{ fontSize: 10, background: 'rgba(255,215,0,0.15)', color: '#b8860b' }}>
-                                            Mashhur
-                                        </span>
+                                        <span className="ca-badge" style={{ fontSize: 10, background: 'rgba(255,215,0,0.15)', color: '#b8860b' }}>Mashhur</span>
                                     )}
                                 </div>
 
@@ -425,7 +402,8 @@ export default function ClinicServices() {
 
                                 <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-primary)', margin: '4px 0 10px' }}>
                                     {(() => {
-                                        const p = getDisplayPrice(s); return (
+                                        const p = getDisplayPrice(s);
+                                        return (
                                             <span>
                                                 {p.label}
                                                 {p.original && <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)', textDecoration: 'line-through', marginLeft: 6 }}>{p.original}</span>}
@@ -440,7 +418,7 @@ export default function ClinicServices() {
                                         <button
                                             className="ca-btn-primary"
                                             style={{ flex: 1, fontSize: 12, justifyContent: 'center' }}
-                                            onClick={() => handleActivate(s.id)}
+                                            onClick={() => handleActivate(s)}
                                         >
                                             Aktivlashtirish
                                         </button>
@@ -498,7 +476,6 @@ export default function ClinicServices() {
                                 <button className="ca-drawer-close" onClick={() => setActiveService(null)}><X size={20} /></button>
                             </div>
                             <div className="ca-drawer-body">
-                                {/* Status + Category badges */}
                                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
                                     <span className={`ca-badge ${activeService.clinicService?.isActive ? 'active' : 'inactive'}`}>
                                         {activeService.clinicService?.isActive ? 'Faol' : 'Nofaol'}
@@ -516,22 +493,14 @@ export default function ClinicServices() {
                                     )}
                                 </div>
 
-                                {/* Info grid */}
                                 <div style={{
                                     display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12,
-                                    padding: 16, borderRadius: 10,
-                                    background: 'var(--bg-main)', marginBottom: 16,
+                                    padding: 16, borderRadius: 10, background: 'var(--bg-main)', marginBottom: 16,
                                 }}>
                                     <div>
                                         <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Davomiyligi</div>
                                         <div style={{ fontSize: 14, fontWeight: 600 }}>{activeService.durationMinutes} daqiqa</div>
                                     </div>
-                                    {activeService.clinicService?.estimatedDuration && (
-                                        <div>
-                                            <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Klinika davomiyligi</div>
-                                            <div style={{ fontSize: 14, fontWeight: 600 }}>{activeService.clinicService.estimatedDuration} daqiqa</div>
-                                        </div>
-                                    )}
                                     <div>
                                         <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Tavsiya narx</div>
                                         <div style={{ fontSize: 14, fontWeight: 600 }}>{fmt(activeService.priceRecommended)} UZS</div>
@@ -540,9 +509,14 @@ export default function ClinicServices() {
                                         <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Narx oraliq</div>
                                         <div style={{ fontSize: 14, fontWeight: 600 }}>{fmt(activeService.priceMin)} — {fmt(activeService.priceMax)}</div>
                                     </div>
+                                    {activeService.clinicService?.customPrice && (
+                                        <div>
+                                            <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Klinika narxi</div>
+                                            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-primary)' }}>{fmt(activeService.clinicService.customPrice)} UZS</div>
+                                        </div>
+                                    )}
                                 </div>
 
-                                {/* Price box */}
                                 <div style={{
                                     background: 'rgba(0,201,167,0.08)', border: '1px solid rgba(0,201,167,0.2)',
                                     padding: 20, borderRadius: 12, marginBottom: 16, textAlign: 'center',
@@ -553,7 +527,6 @@ export default function ClinicServices() {
                                     </div>
                                 </div>
 
-                                {/* Description */}
                                 {(activeService.clinicService?.displayDescriptionUz || activeService.shortDescription) && (
                                     <div style={{ marginBottom: 16 }}>
                                         <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>Tavsifi</div>
@@ -563,12 +536,10 @@ export default function ClinicServices() {
                                     </div>
                                 )}
 
-                                {/* Preparation */}
                                 {activeService.clinicService?.preparationUz && (
                                     <div style={{
                                         padding: 14, borderRadius: 10,
-                                        background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)',
-                                        marginBottom: 12,
+                                        background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', marginBottom: 12,
                                     }}>
                                         <div style={{ fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, color: '#3b82f6' }}>
                                             <Info size={14} /> Tayyorgarlik ko&#39;rsatmalari
@@ -577,8 +548,7 @@ export default function ClinicServices() {
                                     </div>
                                 )}
 
-                                {/* Benefits */}
-                                {activeService.clinicService?.benefits && Array.isArray(activeService.clinicService.benefits) && activeService.clinicService.benefits.length > 0 && (
+                                {activeService.clinicService?.benefits?.length > 0 && (
                                     <div style={{ marginBottom: 16 }}>
                                         <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>Afzalliklar</div>
                                         <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.8 }}>
@@ -589,7 +559,6 @@ export default function ClinicServices() {
                                     </div>
                                 )}
 
-                                {/* Tags */}
                                 {activeService.clinicService?.tags?.length > 0 && (
                                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
                                         {activeService.clinicService.tags.map(tag => (
@@ -598,7 +567,6 @@ export default function ClinicServices() {
                                     </div>
                                 )}
 
-                                {/* Images */}
                                 {activeService.clinicService?.images?.length > 0 && (
                                     <div style={{ marginBottom: 16 }}>
                                         <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>Rasmlar</div>
@@ -614,7 +582,6 @@ export default function ClinicServices() {
                                 )}
                             </div>
 
-                            {/* Drawer footer */}
                             <div className="ca-drawer-footer">
                                 {activeService.clinicService?.isActive && (
                                     <button
@@ -632,11 +599,20 @@ export default function ClinicServices() {
                 )}
             </AnimatePresence>
 
-            {/* ═══ CUSTOMIZATION DRAWER ═══ */}
+            {/* ═══ CUSTOMIZATION DRAWER (regular edit) ═══ */}
             <ServiceCustomizationDrawer
                 open={!!customizeService}
-                onClose={() => setCustomizeService(null)}
+                onClose={() => { setCustomizeService(null); refetch(); }}
                 service={customizeService}
+            />
+
+            {/* ═══ ACTIVATE FLOW DRAWER ═══ */}
+            <ServiceCustomizationDrawer
+                open={!!activateDrawerService}
+                onClose={() => setActivateDrawerService(null)}
+                service={activateDrawerService}
+                activateMode={true}
+                onSaveAndActivate={handleSaveAndActivate}
             />
 
             {/* ═══ DEACTIVATE CONFIRM ═══ */}

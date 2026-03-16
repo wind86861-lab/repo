@@ -41,10 +41,12 @@ const EMPTY_FORM = {
     displayOrder: null,
 };
 
-export default function ServiceCustomizationDrawer({ open, onClose, service }) {
+export default function ServiceCustomizationDrawer({ open, onClose, service, activateMode = false, onSaveAndActivate }) {
     const [activeTab, setActiveTab] = useState(0);
     const [formData, setFormData] = useState(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [priceError, setPriceError] = useState(false);
+    const [activating, setActivating] = useState(false);
 
     const clinicServiceId = service?.clinicService?.id;
 
@@ -56,15 +58,15 @@ export default function ServiceCustomizationDrawer({ open, onClose, service }) {
     const upsertMut = useUpsertCustomization();
     const deleteMut = useDeleteCustomization();
 
-    // Init form data when customization loads
+    // Init form data
     useEffect(() => {
         if (!open) return;
         if (customization) {
             setFormData({ ...EMPTY_FORM, ...customization });
-        } else if (clinicServiceId && !isLoading) {
+        } else if (!isLoading) {
             setFormData({ ...EMPTY_FORM });
         }
-    }, [customization, clinicServiceId, open, isLoading]);
+    }, [customization, open, isLoading]);
 
     // Reset on close
     useEffect(() => {
@@ -72,13 +74,12 @@ export default function ServiceCustomizationDrawer({ open, onClose, service }) {
             setActiveTab(0);
             setFormData(null);
             setShowDeleteConfirm(false);
+            setPriceError(false);
+            setActivating(false);
         }
     }, [open]);
 
-    const handleSave = async () => {
-        if (!clinicServiceId || !formData) return;
-
-        // Clean empty strings to null for optional fields
+    const buildCleanedData = () => {
         const cleaned = { ...formData };
         ['customNameUz', 'customNameRu', 'customDescriptionUz', 'customDescriptionRu',
             'preparationUz', 'preparationRu', 'customCategory'].forEach(k => {
@@ -87,8 +88,31 @@ export default function ServiceCustomizationDrawer({ open, onClose, service }) {
         if (!cleaned.estimatedDurationMinutes) cleaned.estimatedDurationMinutes = null;
         if (!cleaned.displayOrder) cleaned.displayOrder = null;
         if (!cleaned.prepaymentPercentage) cleaned.prepaymentPercentage = null;
+        return cleaned;
+    };
 
-        await upsertMut.mutateAsync({ clinicServiceId, data: cleaned });
+    const handleSave = async () => {
+        if (!formData) return;
+
+        // In activate mode customPrice is required
+        if (activateMode) {
+            if (!formData.customPrice || formData.customPrice <= 0) {
+                setPriceError(true);
+                setActiveTab(0);
+                return;
+            }
+            setPriceError(false);
+            setActivating(true);
+            try {
+                await onSaveAndActivate(service.id, buildCleanedData());
+            } finally {
+                setActivating(false);
+            }
+            return;
+        }
+
+        if (!clinicServiceId) return;
+        await upsertMut.mutateAsync({ clinicServiceId, data: buildCleanedData() });
         onClose();
     };
 
@@ -99,7 +123,7 @@ export default function ServiceCustomizationDrawer({ open, onClose, service }) {
         onClose();
     };
 
-    if (!open || !service?.clinicService) return null;
+    if (!open || !service) return null;
 
     return (
         <AnimatePresence>
@@ -123,7 +147,9 @@ export default function ServiceCustomizationDrawer({ open, onClose, service }) {
                         {/* Header */}
                         <div className="ca-drawer-header">
                             <div>
-                                <span className="ca-drawer-title">Xizmatni moslashtirish</span>
+                                <span className="ca-drawer-title">
+                                    {activateMode ? 'Aktivlashtirish' : 'Xizmatni moslashtirish'}
+                                </span>
                                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                                     {service.nameUz}
                                 </div>
@@ -132,6 +158,34 @@ export default function ServiceCustomizationDrawer({ open, onClose, service }) {
                                 <X size={20} />
                             </button>
                         </div>
+
+                        {/* Activate mode banner */}
+                        {activateMode && (
+                            <div style={{
+                                margin: '0 20px 0', padding: '10px 14px',
+                                background: 'rgba(0,201,167,0.08)', border: '1px solid rgba(0,201,167,0.25)',
+                                borderRadius: 8, fontSize: 13, color: 'var(--text-main)',
+                                display: 'flex', alignItems: 'center', gap: 8,
+                            }}>
+                                <span style={{ fontSize: 18 }}>💡</span>
+                                <span>
+                                    Xizmatni aktivlashtirish uchun <strong style={{ color: 'var(--color-primary)' }}>Klinika narxi</strong> ni kiriting (majburiy).
+                                </span>
+                            </div>
+                        )}
+
+                        {/* Price error banner */}
+                        {priceError && (
+                            <div style={{
+                                margin: '8px 20px 0', padding: '8px 14px',
+                                background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)',
+                                borderRadius: 8, fontSize: 13, color: '#ef4444',
+                                display: 'flex', alignItems: 'center', gap: 8,
+                            }}>
+                                <span>⚠️</span>
+                                <span><strong>Klinika narxi</strong> kiritilishi shart!</span>
+                            </div>
+                        )}
 
                         {/* Tabs */}
                         <div className="ca-tabs" style={{ padding: '0 20px', borderBottom: '1px solid var(--border-color)' }}>
@@ -186,7 +240,7 @@ export default function ServiceCustomizationDrawer({ open, onClose, service }) {
 
                         {/* Footer */}
                         <div className="ca-drawer-footer">
-                            {customization && (
+                            {customization && !activateMode && (
                                 <button
                                     className="ca-btn-danger"
                                     style={{ marginRight: 'auto' }}
@@ -199,12 +253,12 @@ export default function ServiceCustomizationDrawer({ open, onClose, service }) {
                             <button
                                 className="ca-btn-primary"
                                 onClick={handleSave}
-                                disabled={upsertMut.isPending}
+                                disabled={upsertMut.isPending || activating}
                             >
-                                {upsertMut.isPending
+                                {(upsertMut.isPending || activating)
                                     ? <Loader2 size={15} className="ca-spin" />
                                     : <Save size={15} />}
-                                Saqlash
+                                {activateMode ? 'Saqlash va Aktivlashtirish' : 'Saqlash'}
                             </button>
                         </div>
                     </motion.div>
