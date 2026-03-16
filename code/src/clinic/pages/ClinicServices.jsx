@@ -71,9 +71,21 @@ export default function ClinicServices() {
         }).catch(err => console.error('Categories fetch error:', err));
     }, []);
 
+    const activeCategoryId = subcategoryFilter !== 'all' ? subcategoryFilter : (categoryFilter !== 'all' ? categoryFilter : undefined);
+
+    // Debug logging
+    useEffect(() => {
+        console.log('🔍 Filter Debug:', {
+            categoryFilter,
+            subcategoryFilter,
+            activeCategoryId,
+            search: debouncedSearch,
+        });
+    }, [categoryFilter, subcategoryFilter, activeCategoryId, debouncedSearch]);
+
     const { data: services, isLoading, refetch } = useClinicServices({
         search: debouncedSearch || undefined,
-        categoryId: subcategoryFilter !== 'all' ? subcategoryFilter : (categoryFilter !== 'all' ? categoryFilter : undefined),
+        categoryId: activeCategoryId,
         onlyActive: false,
     });
 
